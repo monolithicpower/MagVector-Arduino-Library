@@ -1,0 +1,45 @@
+#######################################
+# Syntax Coloring Map For MagVector-Library
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+MV300SensorI2c	KEYWORD1
+MV300SensorSpi	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+begin                                   KEYWORD2
+end                                     KEYWORD2
+setDeviceAddress                        KEYWORD2
+getDeviceAddress                        KEYWORD2
+setDataMode                             KEYWORD2
+getDataMode                             KEYWORD2
+setChipSelectPin                        KEYWORD2
+setClockFrequency                       KEYWORD2
+getClockFrequency                       KEYWORD2
+readMagneticComponents                  KEYWORD2
+readRegisterQuickReadMode               KEYWORD2
+readRegisterBurstMode                   KEYWORD2
+writeRegisterBurstMode                  KEYWORD2
+readRegister                            KEYWORD2
+writeRegister                           KEYWORD2
+readMagneticComponentsWithCrcCheck      KEYWORD2
+readRegisterQuickReadModeWithCrcCheck   KEYWORD2
+readRegisterBurstModeWithCrcCheck       KEYWORD2
+readRegisterWithCrcCheck                KEYWORD2
+writeRegisterWithCrcCheck               KEYWORD2
+
+#######################################
+# Instances (KEYWORD2)
+#######################################
+mv300sensori2c	KEYWORD2
+mv300sensorspi	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
