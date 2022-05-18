@@ -1,4 +1,5 @@
 #include "mv300sensor.h"
+#include <math.h>
 
 uint8_t crcPolynomialLookupTable[256] ={0x00,0x07,0x0e,0x09,0x1c,0x1b,0x12,0x15,0x38,0x3f,0x36,0x31,0x24,0x23,0x2a,0x2d,
                                         0x70,0x77,0x7e,0x79,0x6c,0x6b,0x62,0x65,0x48,0x4f,0x46,0x41,0x54,0x53,0x5a,0x5d,
@@ -16,6 +17,8 @@ uint8_t crcPolynomialLookupTable[256] ={0x00,0x07,0x0e,0x09,0x1c,0x1b,0x12,0x15,
                                         0x3e,0x39,0x30,0x37,0x22,0x25,0x2c,0x2b,0x06,0x01,0x08,0x0f,0x1a,0x1d,0x14,0x13,
                                         0xae,0xa9,0xa0,0xa7,0xb2,0xb5,0xbc,0xbb,0x96,0x91,0x98,0x9f,0x8a,0x8d,0x84,0x83,
                                         0xde,0xd9,0xd0,0xd7,0xc2,0xc5,0xcc,0xcb,0xe6,0xe1,0xe8,0xef,0xfa,0xfd,0xf4,0xf3};
+
+const double convertRadiansToDegrees=180.0/M_PI;
 
 int16_t twosComplement(uint16_t value, uint8_t numberOfBits) {
   if ((value & (1 << (numberOfBits - 1))) != 0) {
@@ -39,11 +42,17 @@ double convertTemperatureFromLsbToDegreeCelsius(int16_t temperatureInLsb) {
   return (temperatureInLsb/5.0)-41.0;
 }
 
-MV300SensorI2c::MV300SensorI2c(){
+void computeNormThetaPhi(double magFieldBx, double magFieldBy, double magFieldBz, double *norm, double *theta, double *phi) {
+  *norm = sqrt(pow(magFieldBx, 2)+pow(magFieldBy, 2)+pow(magFieldBz, 2));
+  *theta = acos(magFieldBz/(*norm))*convertRadiansToDegrees;
+  *phi = fmod((atan2(magFieldBy, magFieldBx)*convertRadiansToDegrees)+360.0, 360.0);
+}
+
+MV300SensorI2c::MV300SensorI2c() {
   i2cAddress=0x14;
 }
 
-void MV300SensorI2c::begin(){
+void MV300SensorI2c::begin() {
   Wire.begin();
   setClockFrequency(400000);
   //Wire.setClock(100000);//Standard-mode (Sm)
@@ -51,31 +60,34 @@ void MV300SensorI2c::begin(){
   //Wire.setClock(1000000);//Fast-mode Plus (Fm) WARNING: To be tested
 }
 
-void MV300SensorI2c::end(){
+void MV300SensorI2c::end() {
   Wire.end();
 }
 
-void MV300SensorI2c::setDeviceAddress(uint8_t deviceAddress){
+void MV300SensorI2c::setDeviceAddress(uint8_t deviceAddress) {
   i2cAddress=deviceAddress;
 }
 
-uint8_t MV300SensorI2c::getDeviceAddress(){
+uint8_t MV300SensorI2c::getDeviceAddress() {
   return i2cAddress;
 }
 
-void MV300SensorI2c::setClockFrequency(uint32_t clockFrequency){
+void MV300SensorI2c::setClockFrequency(uint32_t clockFrequency) {
   i2cClockFrequency=clockFrequency;
   Wire.setClock(i2cClockFrequency);
 }
 
-uint32_t MV300SensorI2c::getClockFrequency(){
+uint32_t MV300SensorI2c::getClockFrequency() {
   return i2cClockFrequency;
 }
 
-void MV300SensorI2c::readMagneticComponents(uint16_t *magFieldBx, uint16_t *magFieldBy, uint16_t *magFieldBz, uint16_t *temperature, uint8_t *frameCounter){
+void MV300SensorI2c::readMagneticComponents(uint16_t *magFieldBx, uint16_t *magFieldBy, uint16_t *magFieldBz, uint16_t *temperature, uint8_t *frameCounter, uint8_t triggerMode) {
   uint8_t byteCount = 0;
+  Wire.beginTransmission(i2cAddress);
+  Wire.write(byte(((triggerMode<<6)&0xC0) | (0&0x3F)));
+  Wire.endTransmission(false);
   Wire.requestFrom(i2cAddress, 7);
-  while(Wire.available()){
+  while(Wire.available()) {
     readRegistersArray[byteCount] = Wire.read();
     byteCount++;
   }
@@ -86,39 +98,39 @@ void MV300SensorI2c::readMagneticComponents(uint16_t *magFieldBx, uint16_t *magF
   *frameCounter=readRegistersArray[6]&0x03;
 }
 
-uint8_t MV300SensorI2c::readRegisterQuickReadMode(uint8_t numberOfRegisterToRead, uint8_t *readRegisters){
+uint8_t MV300SensorI2c::readRegisterQuickReadMode(uint8_t numberOfRegisterToRead, uint8_t *readRegisters) {
   uint8_t byteCount = 0;
   Wire.requestFrom(i2cAddress, numberOfRegisterToRead);
-  while(Wire.available()){
+  while(Wire.available()) {
     readRegisters[byteCount] = Wire.read();
     byteCount++;
   }
   return byteCount;
 }
 
-uint8_t MV300SensorI2c::readRegisterBurstMode(uint8_t address, uint8_t numberOfRegisterToRead, uint8_t *readRegisters, uint8_t triggerMode){
+uint8_t MV300SensorI2c::readRegisterBurstMode(uint8_t address, uint8_t numberOfRegisterToRead, uint8_t *readRegisters, uint8_t triggerMode) {
   uint8_t byteCount = 0;
   Wire.beginTransmission(i2cAddress);
   Wire.write(byte(((triggerMode<<6)&0xC0) | (address&0x3F)));
   Wire.endTransmission(false);
   Wire.requestFrom(i2cAddress, numberOfRegisterToRead);
-  while(Wire.available()){
+  while(Wire.available()) {
     readRegisters[byteCount] = Wire.read();
     byteCount++;
   }
   return byteCount;
 }
 
-void MV300SensorI2c::writeRegisterBurstMode(uint8_t address, uint8_t numberOfRegisterToWrite, uint8_t *registerValueToWrite, uint8_t triggerMode){
+void MV300SensorI2c::writeRegisterBurstMode(uint8_t address, uint8_t numberOfRegisterToWrite, uint8_t *registerValueToWrite, uint8_t triggerMode) {
   Wire.beginTransmission(i2cAddress);
   Wire.write(byte(((triggerMode<<6)&0xC0) | ((address)&0x3F)));
-  for ( uint8_t i=0;i<numberOfRegisterToWrite; ++i){
+  for ( uint8_t i=0;i<numberOfRegisterToWrite; ++i) {
     Wire.write(byte(registerValueToWrite[i]));
   }
   Wire.endTransmission();
 }
 
-uint8_t MV300SensorI2c::readRegister(uint8_t address, uint8_t triggerMode){
+uint8_t MV300SensorI2c::readRegister(uint8_t address, uint8_t triggerMode) {
   uint8_t readbackValue;
   Wire.beginTransmission(i2cAddress);
   Wire.write(byte(((triggerMode<<6)&0xC0) | (address&0x3F)));
@@ -128,24 +140,30 @@ uint8_t MV300SensorI2c::readRegister(uint8_t address, uint8_t triggerMode){
   return readbackValue;
 }
 
-void MV300SensorI2c::writeRegister(uint8_t address, uint8_t value, uint8_t triggerMode){
+void MV300SensorI2c::writeRegister(uint8_t address, uint8_t value, uint8_t triggerMode) {
   Wire.beginTransmission(i2cAddress);
   Wire.write(byte(((triggerMode<<6)&0xC0) | (address&0x3F)));
   Wire.write(byte(value));
   Wire.endTransmission();
 }
 
-void MV300SensorI2c::readMagneticComponentsWithCrcCheck(uint16_t *magFieldBx, uint16_t *magFieldBy, uint16_t *magFieldBz, uint16_t *temperature, uint8_t *frameCounter, bool *crcErrorDetected){
+void MV300SensorI2c::readMagneticComponentsWithCrcCheck(uint16_t *magFieldBx, uint16_t *magFieldBy, uint16_t *magFieldBz, uint16_t *temperature, uint8_t *frameCounter, bool *crcErrorDetected, uint8_t triggerMode) {
   uint8_t byteCount = 0;
   uint8_t crc = 0;
   uint8_t crcReceived;
   uint8_t readbackValue;
+  uint8_t data;
   *crcErrorDetected=false;
-  Wire.requestFrom(i2cAddress, 7*2);
-  while(Wire.available()){
+  Wire.beginTransmission(i2cAddress);
+  data = ((triggerMode<<6)&0xC0) | (0&0x3F);
+  Wire.write(byte(data));
+  Wire.endTransmission(false);
+  Wire.requestFrom(i2cAddress, 7*2, true);
+  while(Wire.available()) {
     crc = 0;
     crc = crc8(crc, (i2cAddress<<1)+0);
-    crc = crc8(crc, byteCount&0x3F);
+    data = ((triggerMode<<6)&0xC0) | ((0+byteCount)&0x3F);
+    crc = crc8(crc, data);
     crc = crc8(crc, (i2cAddress<<1)+1);
     readbackValue = Wire.read();
     crc = crc8(crc, readbackValue);
@@ -155,7 +173,7 @@ void MV300SensorI2c::readMagneticComponentsWithCrcCheck(uint16_t *magFieldBx, ui
       *crcErrorDetected=true;
     }
     byteCount++;
-  } 
+  }
   *magFieldBx=(readRegistersArray[0]<<4) | ((readRegistersArray[4]&0xF0)>>4);
   *magFieldBy=(readRegistersArray[1]<<4) | (readRegistersArray[4]&0x0F);
   *magFieldBz=(readRegistersArray[2]<<4) | (readRegistersArray[5]&0x0F);
@@ -163,7 +181,7 @@ void MV300SensorI2c::readMagneticComponentsWithCrcCheck(uint16_t *magFieldBx, ui
   *frameCounter=readRegistersArray[6]&0x03;
 }
 
-uint8_t MV300SensorI2c::readRegisterQuickReadModeWithCrcCheck(uint8_t numberOfRegisterToRead, uint8_t* readRegisters, bool *crcErrorDetected){
+uint8_t MV300SensorI2c::readRegisterQuickReadModeWithCrcCheck(uint8_t numberOfRegisterToRead, uint8_t* readRegisters, bool *crcErrorDetected) {
   uint8_t byteCount = 0;
   uint8_t crc = 0;
   uint8_t crcReceived;
@@ -175,7 +193,7 @@ uint8_t MV300SensorI2c::readRegisterQuickReadModeWithCrcCheck(uint8_t numberOfRe
   is_qrsadden = (readRegisterWithCrcCheck(0x11, &dummy, 0) & 0x08) >> 3;
   if (is_qrsadden) first_reg = (readRegisterWithCrcCheck(0x12, &dummy, 0) & 0x1F);
   Wire.requestFrom(i2cAddress, numberOfRegisterToRead*2);
-  while(Wire.available()){
+  while(Wire.available()) {
     crc = 0;
     crc = crc8(crc, (i2cAddress<<1)+1);
     crc = crc8(crc, (first_reg + byteCount)&0x3F);
@@ -191,7 +209,7 @@ uint8_t MV300SensorI2c::readRegisterQuickReadModeWithCrcCheck(uint8_t numberOfRe
   return byteCount;
 }
 
-uint8_t MV300SensorI2c::readRegisterBurstModeWithCrcCheck(uint8_t address, uint8_t numberOfRegisterToRead, uint8_t* readRegisters, bool *crcErrorDetected, uint8_t triggerMode){
+uint8_t MV300SensorI2c::readRegisterBurstModeWithCrcCheck(uint8_t address, uint8_t numberOfRegisterToRead, uint8_t* readRegisters, bool *crcErrorDetected, uint8_t triggerMode) {
   uint8_t byteCount = 0;
   uint8_t crc = 0;
   uint8_t crcReceived;
@@ -203,7 +221,7 @@ uint8_t MV300SensorI2c::readRegisterBurstModeWithCrcCheck(uint8_t address, uint8
   Wire.write(byte(data));
   Wire.endTransmission(false);
   Wire.requestFrom(i2cAddress, numberOfRegisterToRead*2, true);
-  while(Wire.available()){
+  while(Wire.available()) {
     crc = 0;
     crc = crc8(crc, (i2cAddress<<1)+0);
     data = ((triggerMode<<6)&0xC0) | ((address+byteCount)&0x3F);
@@ -221,7 +239,7 @@ uint8_t MV300SensorI2c::readRegisterBurstModeWithCrcCheck(uint8_t address, uint8
   return byteCount;
 }
 
-uint8_t MV300SensorI2c::readRegisterWithCrcCheck(uint8_t address, bool *crcErrorDetected, uint8_t triggerMode){
+uint8_t MV300SensorI2c::readRegisterWithCrcCheck(uint8_t address, bool *crcErrorDetected, uint8_t triggerMode) {
   uint8_t crc = 0;
   uint8_t crcReceived;
   uint8_t readbackValue;
@@ -244,7 +262,7 @@ uint8_t MV300SensorI2c::readRegisterWithCrcCheck(uint8_t address, bool *crcError
   return readbackValue;
 }
 
-void MV300SensorI2c::writeRegisterWithCrcCheck(uint8_t address, uint8_t value, uint8_t triggerMode){
+void MV300SensorI2c::writeRegisterWithCrcCheck(uint8_t address, uint8_t value, uint8_t triggerMode) {
   uint8_t crc = 0;
   uint8_t crcReceived;
   uint8_t data;
@@ -259,23 +277,23 @@ void MV300SensorI2c::writeRegisterWithCrcCheck(uint8_t address, uint8_t value, u
   Wire.endTransmission();
 }
  
-uint8_t MV300SensorI2c::crc8(uint8_t crc, uint8_t data){
+uint8_t MV300SensorI2c::crc8(uint8_t crc, uint8_t data) {
   return crcPolynomialLookupTable[crc^data];
 }
 
-MV300SensorSpi::MV300SensorSpi(){
+MV300SensorSpi::MV300SensorSpi() {
   
 }
 
-void MV300SensorSpi::begin(uint8_t chipSelectPin){
+void MV300SensorSpi::begin(uint8_t chipSelectPin) {
   setChipSelectPin(chipSelectPin);
   spiMaximumSpeed = 10000000;
-  spiDataMode = SPI_MODE3;
+  spiDataMode = SPI_MODE0;
   SPI.begin();
   SPI.beginTransaction(SPISettings(spiMaximumSpeed, MSBFIRST, spiDataMode));
 }
  
-void MV300SensorSpi::begin(int32_t sclkFrequency, uint8_t mode, uint8_t chipSelectPin){
+void MV300SensorSpi::begin(int32_t sclkFrequency, uint8_t mode, uint8_t chipSelectPin) {
   setChipSelectPin(chipSelectPin);
   spiMaximumSpeed = sclkFrequency;
   spiDataMode = mode;
@@ -283,11 +301,11 @@ void MV300SensorSpi::begin(int32_t sclkFrequency, uint8_t mode, uint8_t chipSele
   SPI.beginTransaction(SPISettings(spiMaximumSpeed, MSBFIRST, spiDataMode));
 }
  
-void MV300SensorSpi::end(){
+void MV300SensorSpi::end() {
   SPI.end();
 }
  
-void MV300SensorSpi::readMagneticComponents(uint16_t *magFieldBx, uint16_t *magFieldBy, uint16_t *magFieldBz, uint16_t *temperature, uint8_t *frameCounter, uint8_t triggerMode){
+void MV300SensorSpi::readMagneticComponents(uint16_t *magFieldBx, uint16_t *magFieldBy, uint16_t *magFieldBz, uint16_t *temperature, uint8_t *frameCounter, uint8_t triggerMode) {
   uint8_t byteCount = 0;
   uint8_t address=0;
   digitalWrite(spiChipSelectPin, LOW);
@@ -295,7 +313,7 @@ void MV300SensorSpi::readMagneticComponents(uint16_t *magFieldBx, uint16_t *magF
   SPI.transfer(((triggerMode<<6)&0xC0) | ((1<<5)&0x20) | (address&0x1F));
   for(int i=0;i<7;++i) {
     address=i+1;
-    readRegistersArray[byteCount] = SPI.transfer(((triggerMode<<6)&0xC0) | ((1<<5)&0x20) | (address&0x1F));
+    readRegistersArray[byteCount] = SPI.transfer(((0<<6)&0xC0) | ((1<<5)&0x20) | (address&0x1F));
     byteCount++;
   }
   digitalWrite(spiChipSelectPin, HIGH);
@@ -306,7 +324,7 @@ void MV300SensorSpi::readMagneticComponents(uint16_t *magFieldBx, uint16_t *magF
   *frameCounter=readRegistersArray[6]&0x03;
 }
  
-uint8_t MV300SensorSpi::readRegister(uint8_t address, uint8_t triggerMode){
+uint8_t MV300SensorSpi::readRegister(uint8_t address, uint8_t triggerMode) {
   uint8_t readbackValue;
   digitalWrite(spiChipSelectPin, LOW);
   delayMicroseconds(7); //tcsl
@@ -316,7 +334,7 @@ uint8_t MV300SensorSpi::readRegister(uint8_t address, uint8_t triggerMode){
   return readbackValue;
 }
  
-void MV300SensorSpi::writeRegister(uint8_t address, uint8_t value, uint8_t triggerMode){
+void MV300SensorSpi::writeRegister(uint8_t address, uint8_t value, uint8_t triggerMode) {
   digitalWrite(spiChipSelectPin, LOW);
   delayMicroseconds(7); //tcsl
   SPI.transfer(((triggerMode<<6)&0xC0) | ((0<<5)&0x20) | (address&0x1F));
@@ -324,24 +342,34 @@ void MV300SensorSpi::writeRegister(uint8_t address, uint8_t value, uint8_t trigg
   digitalWrite(spiChipSelectPin, HIGH);
 }
  
-uint8_t MV300SensorSpi::readRegisterQuickReadMode(uint8_t numberOfRegisterToRead, uint8_t* readRegisters, uint8_t triggerMode){
+uint8_t MV300SensorSpi::readRegisterBurstMode(uint8_t address, uint8_t numberOfRegisterToRead, uint8_t *readRegisters, uint8_t triggerMode) {
   uint8_t byteCount = 0;
-  uint8_t address=0;
   digitalWrite(spiChipSelectPin, LOW);
   delayMicroseconds(7); //tcsl
   SPI.transfer(((triggerMode<<6)&0xC0) | ((1<<5)&0x20) | (address&0x1F));
   for(int i=0;i<numberOfRegisterToRead;++i) {
-    address=i+1;
-    readRegisters[byteCount] = SPI.transfer(((triggerMode<<6)&0xC0) | ((1<<5)&0x20) | (address&0x1F));
+    readRegisters[byteCount] = SPI.transfer(((triggerMode<<6)&0xC0) | ((1<<5)&0x20) | ((address+1+i)&0x1F));
     byteCount++;
   }
   digitalWrite(spiChipSelectPin, HIGH);
   return byteCount;
 }
- 
-uint8_t MV300SensorSpi::readRegisterQuickReadModeWithCrcCheck(uint8_t numberOfRegisterToRead, uint8_t* readRegisters, bool *crcErrorDetected, uint8_t triggerMode){
+
+void MV300SensorSpi::writeRegisterBurstMode(uint8_t address, uint8_t numberOfRegisterToWrite, uint8_t *registerValueToWrite, uint8_t triggerMode) {
   uint8_t byteCount = 0;
-  uint8_t address=0;
+  digitalWrite(spiChipSelectPin, LOW);
+  delayMicroseconds(7); //tcsl
+  SPI.transfer(((triggerMode<<6)&0xC0) | ((0<<5)&0x20) | (address&0x1F));
+  for(int i=0;i<numberOfRegisterToWrite;++i) {
+    SPI.transfer(registerValueToWrite[i]);
+    SPI.transfer(((0<<6)&0xC0) | ((0<<5)&0x20) | ((address+1+i)&0x1F));
+    byteCount++;
+  }
+  digitalWrite(spiChipSelectPin, HIGH);
+}
+
+void MV300SensorSpi::readMagneticComponentsWithCrcCheck(uint16_t *magFieldBx, uint16_t *magFieldBy, uint16_t *magFieldBz, uint16_t *temperature, uint8_t *frameCounter, bool *crcErrorDetected, uint8_t triggerMode) {
+  uint8_t byteCount = 0;
   uint16_t readbackResult;
   uint8_t sendValue;
   uint8_t readbackValue;
@@ -349,14 +377,13 @@ uint8_t MV300SensorSpi::readRegisterQuickReadModeWithCrcCheck(uint8_t numberOfRe
   *crcErrorDetected=false;
   digitalWrite(spiChipSelectPin, LOW);
   delayMicroseconds(7); //tcsl
-  sendValue = ((triggerMode<<6)&0xC0) | ((1<<5)&0x20) | (address&0x1F);
+  sendValue = ((triggerMode<<6)&0xC0) | ((1<<5)&0x20) | (0&0x1F);
   readbackResult = SPI.transfer16(((sendValue<<8)&0xFF00) | (crc8(0, sendValue)&0x00FF));
-  for(int i=0;i<numberOfRegisterToRead;++i) {
-    address=i+1;
-    sendValue = ((triggerMode<<6)&0xC0) | ((1<<5)&0x20) | (address&0x1F);
+  for(int i=0;i<7;++i) {
+    sendValue = ((triggerMode<<6)&0xC0) | ((1<<5)&0x20) | ((1+i)&0x1F);
     readbackResult = SPI.transfer16(((sendValue<<8)&0xFF00) | (crc8(0, sendValue)&0x00FF));
     readbackValue = (readbackResult>>8)&0xFF;
-    readRegisters[byteCount]=readbackValue;
+    readRegistersArray[byteCount]=readbackValue;
     crcReceived = readbackResult&0xFF;
     crcChecksum = crc8(0,readbackValue);
     if (crcChecksum != crcReceived) {
@@ -365,10 +392,14 @@ uint8_t MV300SensorSpi::readRegisterQuickReadModeWithCrcCheck(uint8_t numberOfRe
     byteCount++;
   }
   digitalWrite(spiChipSelectPin, HIGH);
-  return byteCount;
+  *magFieldBx=(readRegistersArray[0]<<4) | ((readRegistersArray[4]&0xF0)>>4);
+  *magFieldBy=(readRegistersArray[1]<<4) | (readRegistersArray[4]&0x0F);
+  *magFieldBz=(readRegistersArray[2]<<4) | (readRegistersArray[5]&0x0F);
+  *temperature=(readRegistersArray[3]<<4) | ((readRegistersArray[5]&0xC0)>>4) | ((readRegistersArray[6]&0x30)>>4);
+  *frameCounter=readRegistersArray[6]&0x03;
 }
- 
-uint8_t MV300SensorSpi::readRegisterWithCrcCheck(uint8_t address, bool *crcErrorDetected, uint8_t triggerMode){
+
+uint8_t MV300SensorSpi::readRegisterWithCrcCheck(uint8_t address, bool *crcErrorDetected, uint8_t triggerMode) {
   uint16_t readbackResult;
   uint8_t readbackValue;
   uint8_t sendValue;
@@ -396,7 +427,7 @@ uint8_t MV300SensorSpi::readRegisterWithCrcCheck(uint8_t address, bool *crcError
   return readbackValue;
 }
  
-void MV300SensorSpi::writeRegisterWithCrcCheck(uint8_t address, uint8_t value, bool *crcErrorDetected, uint8_t triggerMode){
+void MV300SensorSpi::writeRegisterWithCrcCheck(uint8_t address, uint8_t value, bool *crcErrorDetected, uint8_t triggerMode) {
   uint16_t readbackResult;
   uint8_t readbackValue;
   uint8_t sendValue;
@@ -429,18 +460,45 @@ void MV300SensorSpi::writeRegisterWithCrcCheck(uint8_t address, uint8_t value, b
   }
   digitalWrite(spiChipSelectPin, HIGH);
 }
+
+uint8_t MV300SensorSpi::readRegisterBurstModeWithCrcCheck(uint8_t address, uint8_t numberOfRegisterToRead, uint8_t* readRegisters, bool *crcErrorDetected, uint8_t triggerMode) {
+  uint8_t byteCount = 0;
+  uint16_t readbackResult;
+  uint8_t sendValue;
+  uint8_t readbackValue;
+  uint8_t crcReceived, crcChecksum;
+  *crcErrorDetected=false;
+  digitalWrite(spiChipSelectPin, LOW);
+  delayMicroseconds(7); //tcsl
+  sendValue = ((triggerMode<<6)&0xC0) | ((1<<5)&0x20) | (address&0x1F);
+  readbackResult = SPI.transfer16(((sendValue<<8)&0xFF00) | (crc8(0, sendValue)&0x00FF));
+  for(int i=0;i<numberOfRegisterToRead;++i) {
+    sendValue = ((triggerMode<<6)&0xC0) | ((1<<5)&0x20) | ((address+1+i)&0x1F);
+    readbackResult = SPI.transfer16(((sendValue<<8)&0xFF00) | (crc8(0, sendValue)&0x00FF));
+    readbackValue = (readbackResult>>8)&0xFF;
+    readRegisters[byteCount]=readbackValue;
+    crcReceived = readbackResult&0xFF;
+    crcChecksum = crc8(0,readbackValue);
+    if (crcChecksum != crcReceived) {
+      *crcErrorDetected=true;
+    }
+    byteCount++;
+  }
+  digitalWrite(spiChipSelectPin, HIGH);
+  return byteCount;
+}
  
-void MV300SensorSpi::setClockFrequency(uint32_t speedMaximum){
+void MV300SensorSpi::setClockFrequency(uint32_t speedMaximum) {
   spiMaximumSpeed = speedMaximum;
   SPI.beginTransaction(SPISettings(spiMaximumSpeed, MSBFIRST, spiDataMode));
 }
  
-void MV300SensorSpi::setDataMode(uint8_t mode){
+void MV300SensorSpi::setDataMode(uint8_t mode) {
   spiDataMode = mode;
   SPI.beginTransaction(SPISettings(spiMaximumSpeed, MSBFIRST, spiDataMode));
 }
  
-void MV300SensorSpi::setChipSelectPin(uint8_t chipSelectPin){
+void MV300SensorSpi::setChipSelectPin(uint8_t chipSelectPin) {
   spiChipSelectPin = chipSelectPin;
   pinMode(spiChipSelectPin, OUTPUT);
   digitalWrite(spiChipSelectPin, HIGH);
@@ -454,7 +512,7 @@ uint8_t MV300SensorSpi::getDataMode() {
   return spiDataMode;
 }
 
-uint8_t crc8(uint8_t crc, uint8_t data){
+uint8_t crc8(uint8_t crc, uint8_t data) {
   return crcPolynomialLookupTable[crc^data];
 }
  

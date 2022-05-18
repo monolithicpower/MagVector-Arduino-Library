@@ -36,6 +36,7 @@ writeRegisterWithCrcCheck	KEYWORD2
 twosComplement	KEYWORD2
 convertMagneticFieldFromLsbToMilliTesla	KEYWORD2
 convertTemperatureFromLsbToDegreeCelsius	KEYWORD2
+computeNormThetaPhi	KEYWORD2
 
 #######################################
 # Instances (KEYWORD2)
