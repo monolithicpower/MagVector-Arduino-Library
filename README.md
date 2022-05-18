@@ -23,14 +23,14 @@ MIT license, all text above must be included in any redistribution.
 
 ## Connections
 ### Power supply
-| Arduino  | MagAlpha |
-| -------- | -------- |
-| GND      | GND      |
+| Arduino  | MagVector |
+| -------- | --------- |
+| GND      | GND       |
 | **+3.3V** (Not 5V)| VDD  |
 
 | Warning |
 | :-------: |
-| Unlike some Arduino & Genuino boards, the **MagAlpha runs at 3.3V**. Even if the I/O can tolerate 5V, check that the voltage applied to VDD is at 3.3V. **Applying a voltages higher than 3.3V to the VDD pin could damage the sensor**.|
+| Unlike some Arduino & Genuino boards, the **MagVector runs at 3.3V**. Even if the I/O can tolerate 5V, check that the voltage applied to VDD is at 3.3V. **Applying a voltages higher than 3.3V to the VDD pin could damage the sensor**.|
 
 ### Serial communication
 MagVector sensors have different communication interfaces available. The MV300 is available with either a I2C or a SPI communication interface.
@@ -44,11 +44,11 @@ MagVector sensors have different communication interfaces available. The MV300 i
 Do not forget to connect SA1 and SA2 pins to define the I2C device address.
 
 #### SPI (4-wire interface)
-| Arduino         | MagAlpha |
-| --------------- | -------- |
-| COPI (aka MOSI) | COPI     |
-| CIPO (aka MISO) | CIPO     |
-| SCK             | SCLK     |
+| Arduino         | MagVector |
+| --------------- | --------- |
+| COPI (aka MOSI) | COPI      |
+| CIPO (aka MISO) | CIPO      |
+| SCK             | SCLK      |
 | any available digital pin (default: pin 7) | /CS |
 
 ## Setup
@@ -56,7 +56,7 @@ Install the library directly from within the Arduino IDE by using the Library Ma
 
 It is also possible to import the library Zip file (check release tab) from the Arduino IDE (Sketch => Include Library => Add .ZIP Library...).
 
-The library can also be manually installed by copying the MagAlpha library folder in your arduinosketchfolder/libraries/ folder. You may need to create the libraries subfolder if its your first library. Restart the IDE to see the library.
+The library can also be manually installed by copying the MagVector library folder in your arduinosketchfolder/libraries/ folder. You may need to create the libraries subfolder if its your first library. Restart the IDE to see the library.
 
 Check this tutorial on Arduino library installation for more information:
 * [All About Arduino Libraries](http://learn.adafruit.com/adafruit-all-about-arduino-libraries-install-use)

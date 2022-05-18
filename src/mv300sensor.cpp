@@ -17,6 +17,28 @@ uint8_t crcPolynomialLookupTable[256] ={0x00,0x07,0x0e,0x09,0x1c,0x1b,0x12,0x15,
                                         0xae,0xa9,0xa0,0xa7,0xb2,0xb5,0xbc,0xbb,0x96,0x91,0x98,0x9f,0x8a,0x8d,0x84,0x83,
                                         0xde,0xd9,0xd0,0xd7,0xc2,0xc5,0xcc,0xcb,0xe6,0xe1,0xe8,0xef,0xfa,0xfd,0xf4,0xf3};
 
+int16_t twosComplement(uint16_t value, uint8_t numberOfBits) {
+  if ((value & (1 << (numberOfBits - 1))) != 0) {
+    value = value - (1 << numberOfBits);
+  }
+  return value;
+}
+
+double convertMagneticFieldFromLsbToMilliTesla(int16_t magneticFieldInLsb, uint8_t brange) {
+  int16_t valueInMilliTesla;
+  if (brange == 0) {
+    valueInMilliTesla=magneticFieldInLsb/7.0;
+  }
+  else {
+    valueInMilliTesla=magneticFieldInLsb/14.0;
+  }
+  return valueInMilliTesla;
+}
+
+double convertTemperatureFromLsbToDegreeCelsius(int16_t temperatureInLsb) {
+  return (temperatureInLsb/5.0)-41.0;
+}
+
 MV300SensorI2c::MV300SensorI2c(){
   i2cAddress=0x14;
 }

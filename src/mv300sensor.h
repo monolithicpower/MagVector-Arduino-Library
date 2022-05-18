@@ -10,6 +10,10 @@
 #include <SPI.h>
 #include <Wire.h>
 
+int16_t twosComplement(uint16_t value, uint8_t numberOfBits=12);
+double convertMagneticFieldFromLsbToMilliTesla(int16_t magneticFieldInLsb, uint8_t brange=0);
+double convertTemperatureFromLsbToDegreeCelsius(int16_t temperatureInLsb);
+
 class MV300SensorI2c {
 public:
   MV300SensorI2c();
