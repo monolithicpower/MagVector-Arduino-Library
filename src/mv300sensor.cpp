@@ -28,14 +28,12 @@ int16_t twosComplement(uint16_t value, uint8_t numberOfBits) {
 }
 
 double convertMagneticFieldFromLsbToMilliTesla(int16_t magneticFieldInLsb, uint8_t brange) {
-  int16_t valueInMilliTesla;
   if (brange == 0) {
-    valueInMilliTesla=magneticFieldInLsb/7.0;
+    return magneticFieldInLsb/7.0;
   }
   else {
-    valueInMilliTesla=magneticFieldInLsb/14.0;
+    return magneticFieldInLsb/14.0;
   }
-  return valueInMilliTesla;
 }
 
 double convertTemperatureFromLsbToDegreeCelsius(int16_t temperatureInLsb) {
