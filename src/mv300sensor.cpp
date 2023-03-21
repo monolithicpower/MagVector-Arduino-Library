@@ -262,7 +262,6 @@ uint8_t MV300SensorI2c::readRegisterWithCrcCheck(uint8_t address, bool *crcError
 
 void MV300SensorI2c::writeRegisterWithCrcCheck(uint8_t address, uint8_t value, uint8_t triggerMode) {
   uint8_t crc = 0;
-  uint8_t crcReceived;
   uint8_t data;
   Wire.beginTransmission(i2cAddress);
   crc = crc8(crc, (i2cAddress<<1)+0);
@@ -406,7 +405,7 @@ uint8_t MV300SensorSpi::readRegisterWithCrcCheck(uint8_t address, bool *crcError
   digitalWrite(spiChipSelectPin, LOW);
   delayMicroseconds(7); //tcsl
   sendValue = ((triggerMode<<6)&0xC0) | ((1<<5)&0x20) | (address&0x1F);
-  readbackResult = SPI.transfer16((sendValue<<8)&0xFF00 | (crc8(0, sendValue)&0x00FF));
+  readbackResult = SPI.transfer16(((sendValue<<8)&0xFF00) | (crc8(0, sendValue)&0x00FF));
   readbackValue = (readbackResult>>8)&0xFF;
   crcReceived = readbackResult&0xFF;
   crcChecksum = crc8(0,readbackValue);
@@ -441,7 +440,7 @@ void MV300SensorSpi::writeRegisterWithCrcCheck(uint8_t address, uint8_t value, b
   if (crcChecksum != crcReceived) {
     *crcErrorDetected=true;
   }
-  readbackResult = SPI.transfer16((value<<8)&0xFF00 | crc8(0,value)&0x00FF);
+  readbackResult = SPI.transfer16(((value<<8)&0xFF00) | (crc8(0,value)&0x00FF));
   readbackValue = (readbackResult>>8)&0xFF;
   crcReceived = readbackResult&0xFF;
   crcChecksum = crc8(0,readbackValue);
