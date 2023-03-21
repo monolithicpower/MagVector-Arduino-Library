@@ -1,3 +1,4 @@
+[![Compile Examples](https://github.com/monolithicpower/MagVector-Arduino-Library/actions/workflows/compile-examples.yml/badge.svg)](https://github.com/monolithicpower/MagVector-Arduino-Library/actions/workflows/compile-examples.yml)
 # MagVector-Arduino-Library
 Arduino library for the MPS MagVector 3D magnetic sensor.
 
